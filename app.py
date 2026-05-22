@@ -85,13 +85,81 @@ with tab1:
             st.video(f"https://www.youtube.com/embed/{ex['video_id']}")
         st.divider()
 
-# (остальная часть кода с tab2 и tab3 остаётся без изменений — просто скопируй весь код выше)
-
 with tab2:
-    # ... (весь код tab2 остаётся прежним, можешь оставить как было)
+    st.subheader("Запись тренировки")
+    workout_type = st.selectbox(
+        "Тип тренировки",
+        ["Разминка (5–7 мин)", "Основной ЛФК-комплекс", "Упражнения для стоп", "Плавание", "Короткая разминка + стопы"]
+    )
+    
+    log_entry = {"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": workout_type, "exercises": []}
+    
+    if "Разминка" in workout_type or "Короткая" in workout_type:
+        cat = "warm_up"
+    elif "ЛФК" in workout_type:
+        cat = "lfk_core"
+    elif "стоп" in workout_type.lower():
+        cat = "feet"
+    else:
+        cat = None
+    
+    if cat and cat in exercises:
+        for ex in exercises[cat]:
+            st.image(f"images/{ex['file']}", caption=ex['name'], use_container_width=True)
+            st.write(ex['desc'])
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                sets_done = st.text_input(f"Подходы ({ex['sets']})", value=ex['sets'], key=f"sets_{ex['name']}")
+            with col2:
+                reps_done = st.text_input("Повторения / время", key=f"reps_{ex['name']}")
+            with col3:
+                quality = st.selectbox("Правильность", ["Отлично", "Хорошо", "Средне", "Была ошибка", "Боль в пояснице"], key=f"q_{ex['name']}")
+            
+            note = st.text_input("Заметки", value="—", key=f"note_{ex['name']}")
+            
+            if st.button(f"✅ Сохранить {ex['name']}", key=f"save_{ex['name']}"):
+                log_entry["exercises"].append({
+                    "name": ex['name'],
+                    "sets": sets_done,
+                    "reps": reps_done,
+                    "quality": quality,
+                    "note": note
+                })
+                st.success(f"{ex['name']} сохранено!")
+    
+    if "Плавание" in workout_type:
+        time = st.number_input("Минут плавания", min_value=10, max_value=60, value=25)
+        style = st.text_input("Стиль", value="Кроль на спине")
+        if st.button("✅ Сохранить плавание"):
+            log_entry["exercises"].append({"name": "Плавание", "time": f"{time} мин", "style": style})
+            st.success("Плавание сохранено!")
+    
+    if st.button("💾 Сохранить всю тренировку", type="primary"):
+        if log_entry["exercises"] or "Плавание" in workout_type:
+            log = load_log()
+            log.append(log_entry)
+            save_log(log)
+            st.balloons()
+            st.success("Тренировка успешно сохранена! 🎉")
+        else:
+            st.warning("Добавь хотя бы одно упражнение")
 
 with tab3:
-    # ... (весь код tab3 остаётся прежним)
+    st.subheader("История тренировок")
+    log = load_log()
+    if log:
+        df = pd.DataFrame([
+            {
+                "Дата": entry["date"],
+                "Тип": entry["type"],
+                "Упражнений": len(entry["exercises"]),
+                "Примечание": entry["exercises"][0]["note"] if entry["exercises"] else "—"
+            } for entry in log
+        ])
+        st.dataframe(df.sort_values("Дата", ascending=False), use_container_width=True)
+    else:
+        st.info("Пока нет записанных тренировок")
 
 st.sidebar.success("Приложение работает на iPhone!")
 st.sidebar.caption("Версия май 2026 с видео")
